@@ -1,41 +1,143 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ==============================================================================
+# NxtLearnn — Full-Stack Platform Root .gitignore
+# Stack: React + Vite + Tailwind CSS | Python + FastAPI | Neon PostgreSQL
+# ==============================================================================
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
+# ------------------------------------------------------------------------------
+# 1. Environment Variables & Secrets (CRITICAL for Neon DB & Auth Tokens)
+# ------------------------------------------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+*.env.*
 *.pem
+*.key
+*.cert
+*.crt
 
-# debug
+# Allow committing sample/template configs
+!.env.example
+!.env.*.example
+
+# ------------------------------------------------------------------------------
+# 2. Python & FastAPI Backend
+# ------------------------------------------------------------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing, Coverage & Type Checking
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Packaging & Builds
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ------------------------------------------------------------------------------
+# 3. Node.js & React / Vite Frontend
+# ------------------------------------------------------------------------------
+node_modules/
+frontend/node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-ssr/
+frontend/dist/
+frontend/dist-ssr/
+out/
+.next/
+
+# Logs
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Vite cache & local overrides
+*.local
+.vite/
+frontend/.vite/
+.eslintcache
+.stylelintcache
 
-# vercel
-.vercel
+# ------------------------------------------------------------------------------
+# 4. Local Databases & SQLite Caches
+# ------------------------------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+backend/*.db
+backend/*.sqlite3
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# ------------------------------------------------------------------------------
+# 5. OS & Operating System Artifacts
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ------------------------------------------------------------------------------
+# 6. IDEs, Editors & AI Agent Artifacts
+# ------------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-workspace
+*.sublime-project
+.gemini/
+scratch/
