@@ -1,20 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Sparkles,
-  Lock,
-  Mail,
-  ArrowRight,
-  Loader2,
-  CheckCircle2,
-  X,
-  KeyRound,
-  UserPlus,
-  ArrowLeft,
-  ChevronRight,
-  Globe,
-} from 'lucide-react';
+import { Sparkles, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { COURSES } from '../../data/coursesData';
 
 // Clean SVG Icons for Google and GitHub
@@ -63,82 +50,21 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [socialLoading, setSocialLoading] = useState(null);
-  const [savedAccounts, setSavedAccounts] = useState([]);
 
-  // Account Chooser Popup Modal State
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [modalView, setModalView] = useState('list'); // 'list' | 'add_account'
-  const [newEmail, setNewEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [modalError, setModalError] = useState('');
-
-  const {
-    login,
-    loginWithSavedAccount,
-    signInWithSocial,
-    getSavedAccounts: fetchSaved,
-    removeAccountFromDevice,
-  } = useAuth();
+  const { login, signInWithSocial } = useAuth();
   const navigate = useNavigate();
 
-  // Load remembered accounts on this device
-  useEffect(() => {
-    if (fetchSaved) {
-      setSavedAccounts(fetchSaved());
-    }
-  }, [fetchSaved]);
-
-  // Click on a saved email in the Google popup: Instantly logs in without password!
-  const handleSavedAccountClick = async (account) => {
-    setError('');
-    setModalError('');
-    setIsSubmitting(true);
-    try {
-      await loginWithSavedAccount(account);
-      setShowAccountModal(false);
-      navigate(courseSlug ? `/courses/${courseSlug}` : '/dashboard');
-    } catch (err) {
-      const msg = err.message || 'Failed to sign in with account.';
-      setError(msg);
-      setModalError(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRemoveAccount = (e, targetEmail) => {
-    e.stopPropagation();
-    const updated = removeAccountFromDevice(targetEmail);
-    setSavedAccounts(updated);
-  };
-
-  // Standard email form on page
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!email) {
-      setError('Please enter your email address.');
+    if (!email || !password) {
+      setError('Please fill in both email and password.');
       return;
     }
 
-    const normalized = email.trim().toLowerCase();
-    const isSaved = savedAccounts.some((a) => a.email.toLowerCase() === normalized);
-
     setError('');
     setIsSubmitting(true);
-
     try {
-      if (isSaved) {
-        const found = savedAccounts.find((a) => a.email.toLowerCase() === normalized);
-        await loginWithSavedAccount(found);
-      } else {
-        if (!password) {
-          setError('Password is required for new sign-in.');
-          setIsSubmitting(false);
-          return;
-        }
-        await login(email, password);
-      }
-
+      await login(email, password);
       navigate(courseSlug ? `/courses/${courseSlug}` : '/dashboard');
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
@@ -147,18 +73,8 @@ export default function LoginPage() {
     }
   };
 
-  // Click "Continue with Google": Opens the popup modal displaying device emails!
-  const handleGoogleClick = () => {
+  const handleSocialAuth = async (provider) => {
     setError('');
-    setModalError('');
-    setModalView('list');
-    setShowAccountModal(true);
-  };
-
-  // Direct OAuth via Google / GitHub
-  const handleDirectOAuth = async (provider) => {
-    setError('');
-    setModalError('');
     setSocialLoading(provider);
     try {
       const callbackPath = courseSlug ? `/courses/${courseSlug}` : '/dashboard';
@@ -169,32 +85,11 @@ export default function LoginPage() {
     }
   };
 
-  // Inside Modal: User clicks "Use another email" -> asks for password
-  const handleModalAddNewAccount = async (e) => {
-    e.preventDefault();
-    if (!newEmail || !newPassword) {
-      setModalError('Both email and password are required for a new account.');
-      return;
-    }
-
-    setModalError('');
-    setIsSubmitting(true);
-    try {
-      await login(newEmail, newPassword);
-      setShowAccountModal(false);
-      navigate(courseSlug ? `/courses/${courseSlug}` : '/dashboard');
-    } catch (err) {
-      setModalError(err.message || 'Authentication failed. Please verify your credentials.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 relative">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md space-y-6">
         
-        {/* Main Clean Card (NO extra top boxes) */}
+        {/* Card */}
         <div className="p-8 rounded-3xl bg-white dark:bg-[#060b19] border border-slate-200 dark:border-white/10 shadow-2xl space-y-6">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 mb-2 border border-sky-200 dark:border-sky-500/20">
@@ -202,7 +97,7 @@ export default function LoginPage() {
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">Welcome Back</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Sign in to continue your learning journey
+              Sign in with your Neon account to continue learning
             </p>
           </div>
 
@@ -233,22 +128,25 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Social OAuth Buttons */}
+          {/* Social OAuth Providers (Google & GitHub) */}
           <div className="space-y-2.5">
-            {/* Continue with Google button: Pops up the Google Account Chooser Modal */}
             <button
               type="button"
-              onClick={handleGoogleClick}
+              onClick={() => handleSocialAuth('google')}
               disabled={isSubmitting || socialLoading !== null}
               className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-white dark:bg-[#030612] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
             >
-              <GoogleIcon className="w-4 h-4" />
+              {socialLoading === 'google' ? (
+                <Loader2 className="w-4 h-4 animate-spin text-sky-500" />
+              ) : (
+                <GoogleIcon className="w-4 h-4" />
+              )}
               <span>Continue with Google</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleDirectOAuth('github')}
+              onClick={() => handleSocialAuth('github')}
               disabled={isSubmitting || socialLoading !== null}
               className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#24292e] hover:bg-[#1b1f23] text-white border border-black/20 shadow-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
             >
@@ -289,14 +187,9 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Password
-                </label>
-                <span className="text-[10px] text-slate-400">
-                  Required for new sign-in
-                </span>
-              </div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -310,7 +203,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Submit Action */}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -344,211 +236,6 @@ export default function LoginPage() {
         </div>
 
       </div>
-
-      {/* =========================================================================
-          GOOGLE ACCOUNT CHOOSER POPUP MODAL (Appears on clicking Continue with Google)
-          ========================================================================= */}
-      {showAccountModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setShowAccountModal(false)}
-        >
-          <div 
-            className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#070d1e] border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden p-6 space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <GoogleIcon className="w-5 h-5" />
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                    {modalView === 'list' ? 'Choose an account' : 'Sign in with new account'}
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  to continue to <span className="font-bold text-slate-700 dark:text-slate-200">NxtLearnn</span>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAccountModal(false)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {modalError && (
-              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-xs text-red-600 dark:text-red-400">
-                {modalError}
-              </div>
-            )}
-
-            {/* View 1: List of Emails on this Device */}
-            {modalView === 'list' && (
-              <div className="space-y-4">
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                  {savedAccounts.length > 0 ? (
-                    savedAccounts.map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        disabled={isSubmitting}
-                        onClick={() => handleSavedAccountClick(acc)}
-                        className="w-full flex items-center justify-between p-3 rounded-2xl border border-slate-200/80 dark:border-white/10 hover:border-sky-500/60 bg-slate-50/50 hover:bg-sky-50/30 dark:bg-white/[0.02] dark:hover:bg-sky-500/10 transition-all text-left group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {acc.image ? (
-                            <img
-                              src={acc.image}
-                              alt={acc.name}
-                              className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200 dark:border-white/10"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0 uppercase">
-                              {acc.name ? acc.name.charAt(0) : acc.email.charAt(0)}
-                            </div>
-                          )}
-                          <div className="truncate">
-                            <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                              {acc.name}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                              {acc.email}
-                            </p>
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                              <CheckCircle2 className="w-2.5 h-2.5" />
-                              Ready • Instant Login
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={(e) => handleRemoveAccount(e, acc.email)}
-                            title="Remove from device"
-                            className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/10 text-center space-y-2">
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        No Google accounts remembered on this device yet.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Option to use another account or sign in with Google OAuth */}
-                <div className="pt-2 border-t border-slate-100 dark:border-white/10 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewEmail('');
-                      setNewPassword('');
-                      setModalError('');
-                      setModalView('add_account');
-                    }}
-                    className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 border border-dashed border-slate-300 dark:border-white/10 flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <UserPlus className="w-4 h-4 text-sky-500" />
-                    <span>Use another email (Requires password)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDirectOAuth('google')}
-                    className="w-full py-2 px-3 rounded-xl text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Globe className="w-3.5 h-3.5" />
-                    <span>Or open Google.com account chooser →</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* View 2: Use another account (requires password for verification) */}
-            {modalView === 'add_account' && (
-              <form onSubmit={handleModalAddNewAccount} className="space-y-3.5">
-                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                  <KeyRound className="w-4 h-4 shrink-0 text-amber-500" />
-                  <span>Entering a different email requires a password to verify this device.</span>
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="student@example.com"
-                    required
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-[#030612] border border-slate-200 dark:border-white/10 text-xs focus:ring-2 focus:ring-sky-500/50 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-[#030612] border border-slate-200 dark:border-white/10 text-xs focus:ring-2 focus:ring-sky-500/50 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="pt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setModalError('');
-                      setModalView('list');
-                    }}
-                    className="py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 border border-slate-200 dark:border-white/10 transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-sky-400 via-sky-500 to-indigo-600 hover:from-sky-300 hover:to-indigo-500 shadow-md shadow-sky-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Verifying...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Sign In & Save Device</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
