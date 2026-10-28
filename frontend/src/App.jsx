@@ -9,10 +9,12 @@ import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import DashboardPage from './pages/student/DashboardPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminLessonEditPage from './pages/admin/AdminLessonEditPage';
 import { useAuth } from './context/AuthContext';
 
 import CourseDetailsPage from './pages/courses/CourseDetailsPage';
 import CourseClassroomPage from './pages/courses/CourseClassroomPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { isAuthenticated, isAdmin, loading } = useAuth();
@@ -41,7 +43,8 @@ export default function App() {
     <div className="flex flex-col min-h-screen bg-gray-50 text-gray-900 dark:bg-[#02050e] dark:text-gray-100 transition-colors">
       <Navbar />
       <main className="flex-1">
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
           {/* Public Marketing */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/courses" element={<CoursesCatalog />} />
@@ -72,10 +75,27 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/courses/:id"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/courses/:courseId/lessons/:lessonId"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLessonEditPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>

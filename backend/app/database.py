@@ -37,8 +37,39 @@ async def get_db():
         finally:
             await session.close()
 
+from sqlalchemy import text
+
+async def sync_missing_columns(conn):
+    dialect = engine.dialect.name
+    for table_name, table in Base.metadata.tables.items():
+        try:
+            if dialect == "sqlite":
+                res = await conn.execute(text(f"PRAGMA table_info({table_name});"))
+                existing_cols = {r[1] for r in res.fetchall()}
+            else:
+                res = await conn.execute(
+                    text("SELECT column_name FROM information_schema.columns WHERE table_name = :t"),
+                    {"t": table_name}
+                )
+                existing_cols = {r[0] for r in res.fetchall()}
+
+            if not existing_cols:
+                continue
+
+            for col in table.columns:
+                if col.name not in existing_cols:
+                    col_type = col.type.compile(engine.dialect)
+                    stmt = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type};"
+                    try:
+                        await conn.execute(text(stmt))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
 async def init_db():
     import app.models  # noqa
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("Database tables initialized successfully.")
+        await sync_missing_columns(conn)
+    print("Database tables and columns initialized successfully.")

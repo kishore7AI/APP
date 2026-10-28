@@ -10,9 +10,14 @@ class Course(Base):
     title = Column(String(255), nullable=False)
     slug = Column(String(255), unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
+    category = Column(String(100), default="Full-Stack", nullable=True)
+    tags = Column(String(500), default="", nullable=True)
+    level = Column(String(50), default="Intermediate", nullable=True)
     thumbnail_url = Column(String(1000), nullable=True)
+    trailer_url = Column(String(1000), nullable=True)
+    polar_product_id = Column(String(255), nullable=True)  # One-time Polar product ID that sells this course
     price = Column(Integer, default=0, nullable=False)  # in INR
-    status = Column(String(50), default="draft", nullable=False)  # "draft" | "published"
+    status = Column(String(50), default="published", nullable=False)  # "draft" | "published" | "archived"
     deleted_at = Column(DateTime, nullable=True)  # soft delete
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

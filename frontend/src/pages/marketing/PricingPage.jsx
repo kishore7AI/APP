@@ -1,11 +1,18 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Check, Sparkles, HelpCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Check, Sparkles, HelpCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useEnrollment } from '../../hooks/useEnrollment';
 
 export default function PricingPage() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { membership, setMembership } = useEnrollment();
+
   const plans = [
     {
       name: 'Single Course',
+      planKey: 'single',
       price: '₹2,000',
       period: 'one-time',
       description: 'Ideal if you only need mastery in one specific topic or technology stack.',
@@ -14,7 +21,7 @@ export default function PricingPage() {
       href: '/courses',
       features: [
         'Full lifetime access to 1 chosen course',
-        'Adaptive HLS 1080p video player',
+        'Available on tracks with published Polar checkout',
         'Downloadable project source code',
         'Progress saving & resume playback',
         'Certificate of completion',
@@ -22,6 +29,7 @@ export default function PricingPage() {
     },
     {
       name: 'Monthly Membership',
+      planKey: 'monthly',
       price: '₹5,000',
       period: 'per month',
       description: 'Full unhindered access to all existing and newly released courses as long as active.',
@@ -29,7 +37,7 @@ export default function PricingPage() {
       cta: 'Start Monthly Access',
       href: '/signup?plan=monthly',
       features: [
-        'Unlimited access to ALL courses',
+        'Unlimited access to ALL courses (even without Polar product ID)',
         'Immediate access to new monthly releases',
         'Cancel anytime via Polar customer portal',
         'Access retained until end of paid billing cycle',
@@ -38,6 +46,7 @@ export default function PricingPage() {
     },
     {
       name: 'Lifetime Pass',
+      planKey: 'lifetime',
       price: '₹25,000',
       period: 'one-time payment',
       description: 'The ultimate investment. Every current course and every future course, forever.',
@@ -46,13 +55,27 @@ export default function PricingPage() {
       href: '/signup?plan=lifetime',
       features: [
         'Permanent access to EVERYTHING on NxtLearnn',
-        'All future courses automatically unlocked',
+        'All courses unlocked automatically',
         'Direct Discord creator office hours channel',
         'Early beta access to draft curriculum',
         'No recurring fees or subscription fatigue',
       ],
     },
   ];
+
+  const handlePlanClick = (plan) => {
+    if (plan.planKey === 'single') {
+      navigate('/courses');
+      return;
+    }
+    if (isAuthenticated) {
+      setMembership(plan.planKey);
+      alert(`🎉 Success! Your ${plan.name} is now active. All courses are unlocked for you!`);
+      navigate('/courses');
+    } else {
+      navigate(plan.href);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-20">
@@ -115,16 +138,23 @@ export default function PricingPage() {
             </div>
 
             <div className="pt-8">
-              <Link
-                to={plan.href}
-                className={`w-full py-3 px-6 rounded-xl text-center font-bold text-sm transition-all block ${
-                  plan.popular
-                    ? 'bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-500/25'
-                    : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
-                }`}
-              >
-                {plan.cta}
-              </Link>
+              {membership === plan.planKey ? (
+                <div className="w-full py-3 px-6 rounded-xl text-center font-bold text-sm bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Current Active Plan</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handlePlanClick(plan)}
+                  className={`w-full py-3 px-6 rounded-xl text-center font-bold text-sm transition-all block cursor-pointer transform hover:-translate-y-0.5 ${
+                    plan.popular
+                      ? 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                      : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                  }`}
+                >
+                  {plan.cta}
+                </button>
+              )}
             </div>
           </div>
         ))}

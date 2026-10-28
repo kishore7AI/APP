@@ -1,24 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Search, Clock, BookOpen, Sparkles, ArrowRight, Star, 
   Layers, Users, CheckCircle2, Play
 } from 'lucide-react';
 import { COURSES } from '../../data/coursesData';
+import { coursesApi } from '../../api/client';
 import { useEnrollment } from '../../hooks/useEnrollment';
-
-const CATEGORIES = ['All', 'Full-Stack', 'Backend & Systems', 'Frontend', 'DevOps & Cloud', 'AI & Data'];
 
 export default function CoursesCatalog() {
   const { isEnrolled } = useEnrollment();
+  const [coursesList, setCoursesList] = useState(COURSES);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const filteredCourses = COURSES.filter((course) => {
+  // Fetch live courses from API
+  const fetchLiveCourses = async () => {
+    try {
+      const data = await coursesApi.getAll();
+      if (data && Array.isArray(data)) {
+        const formatted = data.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          title: c.title,
+          subtitle: c.description,
+          description: c.description,
+          category: c.category || 'Full-Stack',
+          polar_product_id: c.polar_product_id,
+          can_buy_single: Boolean(c.polar_product_id && c.polar_product_id.trim()),
+          tags: Array.isArray(c.tags)
+            ? c.tags
+            : (c.tags ? c.tags.split(',').map((t) => t.trim()).filter(Boolean) : [c.category || 'Full-Stack']),
+          level: c.level || 'Intermediate',
+          price: c.price !== undefined && c.price > 0 ? `₹${c.price.toLocaleString('en-IN')}` : '₹2,000',
+          priceNumber: c.price || 2000,
+          duration: c.duration || '12h',
+          lessonsCount: c.lessons_count || (c.sections ? c.sections.reduce((acc, s) => acc + (s.lessons?.length || 0), 0) : 0),
+          rating: c.rating || 4.9,
+          studentsCount: c.students_count || 120,
+          thumbnail: c.thumbnail_url || 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=800&auto=format&fit=crop&q=80',
+        }));
+        setCoursesList(formatted);
+      }
+    } catch (err) {
+      console.warn('Fallback to local courses:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveCourses();
+  }, []);
+
+  // Compute categories dynamically from current courses list
+  const categories = useMemo(() => {
+    const rawCategories = coursesList.map((c) => c.category).filter(Boolean);
+    const unique = Array.from(new Set(rawCategories));
+    return ['All', ...unique];
+  }, [coursesList]);
+
+  const filteredCourses = coursesList.filter((course) => {
     const matchesSearch = 
       course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      (course.description && course.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (course.tags && course.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())));
     
     const matchesCategory = 
       selectedCategory === 'All' || course.category === selectedCategory;
@@ -35,7 +82,7 @@ export default function CoursesCatalog() {
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Industry-Grade Curricula • 6 Production Tracks</span>
+              <span>Industry-Grade Curricula • {coursesList.length} Tracks Available</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Explore All Courses
@@ -58,9 +105,9 @@ export default function CoursesCatalog() {
           </div>
         </div>
 
-        {/* Category Filter Pills */}
+        {/* Category Filter Pills (Dynamically populated from database courses) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
@@ -74,12 +121,17 @@ export default function CoursesCatalog() {
             </button>
           ))}
           <span className="text-xs text-slate-400 dark:text-slate-500 ml-auto hidden sm:inline">
-            Showing {filteredCourses.length} of {COURSES.length} courses
+            Showing {filteredCourses.length} of {coursesList.length} courses
           </span>
         </div>
 
-        {/* Courses Grid (6 Courses) */}
-        {filteredCourses.length > 0 ? (
+        {/* Courses Grid */}
+        {loading && coursesList.length === 0 ? (
+          <div className="py-24 text-center space-y-3">
+            <div className="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-slate-500">Loading courses...</p>
+          </div>
+        ) : filteredCourses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredCourses.map((course) => (
               <div
@@ -100,9 +152,18 @@ export default function CoursesCatalog() {
                     {course.category}
                   </div>
 
-                  {/* Price Tag */}
-                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-md text-xs font-bold bg-slate-900/90 text-white border border-white/20 backdrop-blur-md">
-                    {course.price || (course.priceNumber ? `₹${course.priceNumber.toLocaleString()}` : '₹2,499')}
+                  {/* Price or Membership Tag */}
+                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-md text-xs font-bold backdrop-blur-md border shadow-sm">
+                    {course.can_buy_single ? (
+                      <span className="bg-slate-900/90 text-white">
+                        {course.price}
+                      </span>
+                    ) : (
+                      <span className="text-indigo-200 bg-indigo-950/80 border-indigo-400/30 flex items-center gap-1 text-[11px] font-semibold">
+                        <Sparkles className="w-3 h-3 text-indigo-400" />
+                        <span>Membership</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Play Simulation Icon on Hover */}

@@ -213,7 +213,10 @@ export function AuthProvider({ children }) {
   };
 
   const isAuthenticated = !!user;
-  const isAdmin = user?.role === 'admin' || user?.email?.startsWith('admin@');
+  const isAdmin =
+    user?.role === 'admin' ||
+    user?.email?.startsWith('admin@') ||
+    user?.email?.toLowerCase() === 'kishoresabari007@gmail.com';
   const isStudent = !isAdmin;
 
   return (

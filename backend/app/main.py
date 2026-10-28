@@ -13,6 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.api.auth import router as auth_router
+from app.api.admin import router as admin_router
+from app.api.courses import router as courses_router
+from fastapi.staticfiles import StaticFiles
+import os
+
+# Ensure uploads dir exists
+os.makedirs("uploads", exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +55,11 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(auth_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
+app.include_router(courses_router, prefix="/api")
+
+# Static uploads mount
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.get("/")
 async def root():

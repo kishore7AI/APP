@@ -9,6 +9,7 @@ class Lesson(Base):
     id = Column(Integer, primary_key=True, index=True)
     section_id = Column(Integer, ForeignKey("sections.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=True)
     position = Column(Integer, default=0, nullable=False)
     
     # Video & Content
