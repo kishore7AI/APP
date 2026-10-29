@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Star, Users, BookOpen, Clock, RefreshCw, CheckCircle2, 
   Lock, Play, Sparkles, ShieldCheck, ArrowRight, X, 
@@ -10,6 +11,7 @@ import { coursesApi } from '../../api/client';
 import { useEnrollment } from '../../hooks/useEnrollment';
 import { useAuth } from '../../context/AuthContext';
 import ImageKitPlayer from '../../components/video/ImageKitPlayer';
+import Button from '../../components/ui/Button';
 
 export default function CourseDetailsPage() {
   const { slug } = useParams();
@@ -509,24 +511,28 @@ export default function CourseDetailsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 pt-1">
-                    <button
+                  <div className="space-y-2.5 pt-1">
+                    <Button
                       onClick={() => navigate(`/courses/${course.slug}/learn`)}
-                      className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                      variant="primary"
+                      size="lg"
+                      className="w-full text-center"
+                      rightIcon={<ArrowRight className="w-4 h-4" />}
                     >
-                      <span>{progressPercent > 0 ? 'Continue to Classroom' : 'Go to Classroom'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                      {progressPercent > 0 ? 'Continue to Classroom' : 'Go to Classroom'}
+                    </Button>
 
-                    <button
+                    <Button
                       onClick={() => {
                         setActivePreviewLesson(firstLesson);
                         setShowPreviewModal(true);
                       }}
-                      className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 transition-colors cursor-pointer"
+                      variant="secondary"
+                      size="sm"
+                      className="w-full text-center"
                     >
                       Watch video preview
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : !isSingleBuyable ? (
@@ -547,22 +553,26 @@ export default function CourseDetailsPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    <button
+                  <div className="space-y-2.5">
+                    <Button
                       onClick={() => navigate('/pricing')}
-                      className="w-full py-3.5 px-4 rounded-xl font-extrabold text-sm bg-gradient-to-r from-sky-500 via-indigo-600 to-violet-600 hover:from-sky-400 hover:via-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                      variant="primary"
+                      size="lg"
+                      className="w-full text-center"
+                      leftIcon={<Sparkles className="w-4 h-4" />}
                     >
-                      <Sparkles className="w-4 h-4 text-sky-200" />
-                      <span>Unlock with All-Access Membership</span>
-                    </button>
+                      Unlock with All-Access Membership
+                    </Button>
 
-                    <button
+                    <Button
                       onClick={() => setShowPreviewModal(true)}
-                      className="w-full py-3 px-4 rounded-xl font-bold text-xs text-slate-800 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 border border-slate-200 dark:border-white/15 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      variant="secondary"
+                      size="sm"
+                      className="w-full text-center"
+                      leftIcon={<Play className="w-3.5 h-3.5" />}
                     >
-                      <Play className="w-3.5 h-3.5 fill-current text-sky-500" />
-                      <span>Watch Free Preview (Lesson 1)</span>
-                    </button>
+                      Watch Free Preview (Lesson 1)
+                    </Button>
 
                     <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/10 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
                       <div className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
@@ -592,20 +602,24 @@ export default function CourseDetailsPage() {
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    <button
+                  <div className="space-y-2.5">
+                    <Button
                       onClick={handleBuyClick}
-                      className="w-full py-3.5 px-4 rounded-xl font-extrabold text-sm bg-gradient-to-r from-sky-400 via-sky-500 to-indigo-600 hover:from-sky-300 hover:via-sky-400 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                      variant="primary"
+                      size="lg"
+                      className="w-full text-center"
                     >
-                      <span>Buy Course ({course.price ? `₹${course.price.toLocaleString('en-IN')}` : '₹2,000'})</span>
-                    </button>
+                      Buy Course ({course.price ? `₹${course.price.toLocaleString('en-IN')}` : '₹2,000'})
+                    </Button>
 
-                    <button
+                    <Button
                       onClick={() => setShowPreviewModal(true)}
-                      className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 transition-colors cursor-pointer"
+                      variant="secondary"
+                      size="sm"
+                      className="w-full text-center"
                     >
                       Watch free preview
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}

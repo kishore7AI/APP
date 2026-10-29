@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, Layers, ExternalLink, GripVertical, 
   Video, Upload, Trash2, Plus, Film, Image as ImageIcon, 
-  ArrowLeft, Check, AlertCircle, Eye
+  ArrowLeft, Check, AlertCircle, Eye, X, Loader2
 } from 'lucide-react';
-import { adminApi } from '../../api/client';
+import { adminApi, authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import Button from '../../components/ui/Button';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -20,6 +22,17 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [savingChanges, setSavingChanges] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Modern Toast State
+  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' }
+
+  // Custom Delete Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState(null); // { title, message, onConfirm }
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Form State for Active Course
   const [formData, setFormData] = useState({
@@ -41,7 +54,6 @@ export default function AdminDashboard() {
   const [addingSection, setAddingSection] = useState(false);
   const [newLessonTitleBySection, setNewLessonTitleBySection] = useState({});
   const [addingLessonSectionId, setAddingLessonSectionId] = useState(null);
-  const [activeEditingLessonId, setActiveEditingLessonId] = useState(null);
 
   // Upload States
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
@@ -52,7 +64,45 @@ export default function AdminDashboard() {
   const loadCourses = async () => {
     try {
       setLoading(true);
-      const data = await adminApi.getCourses();
+
+      // Ensure backend auth token is synced if user is authenticated
+      if (!localStorage.getItem('nxtlearnn_token') && user?.email) {
+        try {
+          const syncRes = await authApi.syncSession({
+            email: user.email,
+            full_name: user.name || user.full_name,
+            avatar_url: user.image || user.avatar_url,
+          });
+          if (syncRes?.access_token) {
+            localStorage.setItem('nxtlearnn_token', syncRes.access_token);
+          }
+        } catch (syncErr) {
+          console.warn('Initial session sync notice:', syncErr?.message);
+        }
+      }
+
+      let data;
+      try {
+        data = await adminApi.getCourses();
+      } catch (firstErr) {
+        // If credentials error, try self-healing sync once and retry
+        if (user?.email && (firstErr.message?.includes('credentials') || firstErr.message?.includes('token'))) {
+          const syncRes = await authApi.syncSession({
+            email: user.email,
+            full_name: user.name || user.full_name,
+            avatar_url: user.image || user.avatar_url,
+          });
+          if (syncRes?.access_token) {
+            localStorage.setItem('nxtlearnn_token', syncRes.access_token);
+            data = await adminApi.getCourses();
+          } else {
+            throw firstErr;
+          }
+        } else {
+          throw firstErr;
+        }
+      }
+
       setCourses(data || []);
       
       let targetId = activeCourseId;
@@ -74,6 +124,7 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error('Failed to load courses:', err);
+      showToast('Failed to load courses: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -81,7 +132,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadCourses();
-  }, [routeCourseId]);
+  }, [routeCourseId, user?.email]);
 
   const hydrateCourseData = (course) => {
     setActiveCourse(course);
@@ -111,7 +162,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Start Creating a New Course in UI only (does NOT insert dummy to DB)
+  // Start Creating a New Course in UI only
   const handleStartCreateCourse = () => {
     setIsCreatingNew(true);
     setActiveCourseId(null);
@@ -135,7 +186,7 @@ export default function AdminDashboard() {
   const handleSaveChanges = async (e) => {
     if (e) e.preventDefault();
     if (!formData.title.trim()) {
-      alert('Please enter a course title.');
+      showToast('Please enter a course title.', 'error');
       return;
     }
 
@@ -149,7 +200,6 @@ export default function AdminDashboard() {
       setSaveSuccess(false);
 
       if (isCreatingNew) {
-        // Only save to DB when user actually submits
         const created = await adminApi.createCourse({
           title: formData.title.trim(),
           slug: slug,
@@ -167,6 +217,7 @@ export default function AdminDashboard() {
         const updatedList = await adminApi.getCourses();
         setCourses(updatedList);
         setIsCreatingNew(false);
+        showToast('Course created successfully!', 'success');
         handleSelectCourse(created.id);
       } else {
         if (!activeCourse) return;
@@ -185,9 +236,9 @@ export default function AdminDashboard() {
         });
 
         setSaveSuccess(true);
+        showToast('Changes saved successfully!', 'success');
         setTimeout(() => setSaveSuccess(false), 3000);
 
-        // Refresh data
         const updatedList = await adminApi.getCourses();
         setCourses(updatedList);
         const refreshed = updatedList.find((c) => c.id === activeCourse.id);
@@ -196,29 +247,39 @@ export default function AdminDashboard() {
         }
       }
     } catch (err) {
-      alert(`Failed to save course: ${err.message}`);
+      showToast(err.message || 'Failed to save course', 'error');
     } finally {
       setSavingChanges(false);
     }
   };
 
-  // Delete Course
-  const handleDeleteCourse = async (courseId) => {
-    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
-    try {
-      await adminApi.deleteCourse(courseId);
-      const updated = await adminApi.getCourses();
-      setCourses(updated);
-      if (updated.length > 0) {
-        handleSelectCourse(updated[0].id);
-      } else {
-        setActiveCourseId(null);
-        setActiveCourse(null);
-        navigate('/admin');
-      }
-    } catch (err) {
-      alert(`Failed to delete course: ${err.message}`);
-    }
+  // Delete Course with Modal
+  const requestDeleteCourse = (courseId) => {
+    setConfirmModal({
+      title: 'Delete Course',
+      message: 'Are you sure you want to delete this course? All sections, lessons, and curriculum items will be permanently removed. This action cannot be undone.',
+      confirmText: 'Delete Course',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await adminApi.deleteCourse(courseId);
+          showToast('Course deleted successfully.', 'success');
+          const updated = await adminApi.getCourses();
+          setCourses(updated);
+          if (updated.length > 0) {
+            handleSelectCourse(updated[0].id);
+          } else {
+            setActiveCourseId(null);
+            setActiveCourse(null);
+            navigate('/admin');
+          }
+        } catch (err) {
+          showToast(`Failed to delete course: ${err.message}`, 'error');
+        } finally {
+          setConfirmModal(null);
+        }
+      },
+    });
   };
 
   // Add Section
@@ -235,23 +296,34 @@ export default function AdminDashboard() {
       setNewSectionTitle('');
       const updated = await adminApi.getCourse(activeCourse.id);
       hydrateCourseData(updated);
+      showToast('Section added.', 'success');
     } catch (err) {
-      alert(`Failed to add section: ${err.message}`);
+      showToast(`Failed to add section: ${err.message}`, 'error');
     } finally {
       setAddingSection(false);
     }
   };
 
-  // Delete Section
-  const handleDeleteSection = async (sectionId) => {
-    if (!window.confirm('Delete this section and all associated lessons?')) return;
-    try {
-      await adminApi.deleteSection(sectionId);
-      const updated = await adminApi.getCourse(activeCourse.id);
-      hydrateCourseData(updated);
-    } catch (err) {
-      alert(`Failed to delete section: ${err.message}`);
-    }
+  // Delete Section with Modal
+  const requestDeleteSection = (sectionId) => {
+    setConfirmModal({
+      title: 'Delete Section',
+      message: 'Delete this curriculum section and all lessons contained in it?',
+      confirmText: 'Delete Section',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await adminApi.deleteSection(sectionId);
+          const updated = await adminApi.getCourse(activeCourse.id);
+          hydrateCourseData(updated);
+          showToast('Section deleted.', 'success');
+        } catch (err) {
+          showToast(`Failed to delete section: ${err.message}`, 'error');
+        } finally {
+          setConfirmModal(null);
+        }
+      },
+    });
   };
 
   // Add Lesson
@@ -271,23 +343,34 @@ export default function AdminDashboard() {
       setNewLessonTitleBySection((prev) => ({ ...prev, [sectionId]: '' }));
       const updated = await adminApi.getCourse(activeCourse.id);
       hydrateCourseData(updated);
+      showToast('Lesson created.', 'success');
     } catch (err) {
-      alert(`Failed to add lesson: ${err.message}`);
+      showToast(`Failed to add lesson: ${err.message}`, 'error');
     } finally {
       setAddingLessonSectionId(null);
     }
   };
 
-  // Delete Lesson
-  const handleDeleteLesson = async (lessonId) => {
-    if (!window.confirm('Delete this lesson?')) return;
-    try {
-      await adminApi.deleteLesson(lessonId);
-      const updated = await adminApi.getCourse(activeCourse.id);
-      hydrateCourseData(updated);
-    } catch (err) {
-      alert(`Failed to delete lesson: ${err.message}`);
-    }
+  // Delete Lesson with Modal
+  const requestDeleteLesson = (lessonId) => {
+    setConfirmModal({
+      title: 'Delete Lesson',
+      message: 'Are you sure you want to delete this lesson and its video reference?',
+      confirmText: 'Delete Lesson',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await adminApi.deleteLesson(lessonId);
+          const updated = await adminApi.getCourse(activeCourse.id);
+          hydrateCourseData(updated);
+          showToast('Lesson deleted.', 'success');
+        } catch (err) {
+          showToast(`Failed to delete lesson: ${err.message}`, 'error');
+        } finally {
+          setConfirmModal(null);
+        }
+      },
+    });
   };
 
   // Upload Thumbnail
@@ -303,9 +386,10 @@ export default function AdminDashboard() {
         await adminApi.updateCourse(activeCourse.id, { thumbnail_url: res.url });
         const updated = await adminApi.getCourse(activeCourse.id);
         hydrateCourseData(updated);
+        showToast('Thumbnail updated successfully!', 'success');
       }
     } catch (err) {
-      alert(`Thumbnail upload failed: ${err.message}`);
+      showToast(`Thumbnail upload failed: ${err.message}`, 'error');
     } finally {
       setUploadingThumbnail(false);
     }
@@ -324,27 +408,28 @@ export default function AdminDashboard() {
         await adminApi.updateCourse(activeCourse.id, { trailer_url: res.url });
         const updated = await adminApi.getCourse(activeCourse.id);
         hydrateCourseData(updated);
+        showToast('Trailer updated successfully!', 'success');
       }
     } catch (err) {
-      alert(`Trailer upload failed: ${err.message}`);
+      showToast(`Trailer upload failed: ${err.message}`, 'error');
     } finally {
       setUploadingTrailer(false);
     }
   };
 
-  // Upload Lesson Video
+  // Upload Lesson Video directly
   const handleLessonVideoUpload = async (lessonId, file) => {
     if (!file || !activeCourse) return;
     try {
       setUploadingLessonVideoId(lessonId);
       const res = await adminApi.uploadMedia(file, 'courses/lessons');
       if (res && (res.file_id || res.url)) {
-        // Refresh course curriculum
         const updated = await adminApi.getCourse(activeCourse.id);
         hydrateCourseData(updated);
+        showToast('Video uploaded to lesson!', 'success');
       }
     } catch (err) {
-      alert(`Lesson video upload failed: ${err.message}`);
+      showToast(`Lesson video upload failed: ${err.message}`, 'error');
     } finally {
       setUploadingLessonVideoId(null);
     }
@@ -367,15 +452,89 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col md:flex-row antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="min-h-screen bg-[#02050e] text-slate-100 flex flex-col md:flex-row antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
       
       {/* ========================================================================= */}
-      {/* LEFT SIDEBAR (Matching reference navigation: LUMEN Admin style) */}
+      {/* FLOATING TOAST NOTIFICATION (Enterprise UX) */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-xl border flex items-center gap-3 shadow-2xl backdrop-blur-xl ${
+              toast.type === 'error'
+                ? 'bg-rose-950/90 border-rose-500/40 text-rose-200'
+                : 'bg-[#0b1329]/95 border-indigo-500/40 text-indigo-100 shadow-[0_0_25px_rgba(99,102,241,0.2)]'
+            }`}
+          >
+            {toast.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            ) : (
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            )}
+            <span className="text-xs font-medium">{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-2 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* DELETE CONFIRMATION MODAL */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {confirmModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="w-full max-w-md bg-[#080d1a] border border-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl"
+            >
+              <div className="space-y-1.5">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400" />
+                  <span>{confirmModal.title}</span>
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800/80">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmModal(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant={confirmModal.danger ? 'danger' : 'primary'}
+                  size="sm"
+                  onClick={confirmModal.onConfirm}
+                >
+                  {confirmModal.confirmText || 'Confirm'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* LEFT SIDEBAR (Linear / Obsidian Admin Studio) */}
       {/* ========================================================================= */}
       <aside className="w-full md:w-64 bg-[#050814] border-r border-slate-800/80 flex flex-col shrink-0">
         
         {/* Brand Header */}
-        <div className="p-6 border-b border-slate-800/80 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
               <Sparkles className="w-3.5 h-3.5 fill-indigo-400" />
@@ -384,7 +543,7 @@ export default function AdminDashboard() {
               NxtLearnn
             </span>
           </div>
-          <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full border border-slate-700/80 bg-slate-800/40 text-slate-300">
+          <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full border border-indigo-500/20 bg-indigo-500/10 text-indigo-300">
             Admin
           </span>
         </div>
@@ -396,7 +555,7 @@ export default function AdminDashboard() {
               <Layers className="w-4 h-4 text-indigo-400" />
               <span>Courses</span>
             </div>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-indigo-500/20 text-indigo-300">
+            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-indigo-500/20 text-indigo-300 font-mono">
               {courses.length}
             </span>
           </div>
@@ -414,18 +573,20 @@ export default function AdminDashboard() {
           <div className="pt-6">
             <div className="flex items-center justify-between px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <span>Your Courses</span>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleStartCreateCourse}
-                className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer font-semibold text-xs"
               >
                 <Plus className="w-3 h-3" />
                 <span>New</span>
-              </button>
+              </motion.button>
             </div>
 
             <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
               {isCreatingNew && (
-                <div className="w-full text-left px-3 py-2 rounded-lg text-xs truncate bg-indigo-950/70 text-indigo-200 font-semibold border border-indigo-500/40 shadow-sm flex items-center justify-between">
+                <div className="w-full text-left px-3 py-2 rounded-xl text-xs truncate bg-indigo-950/70 text-indigo-200 font-semibold border border-indigo-500/40 shadow-sm flex items-center justify-between">
                   <span className="truncate">{formData.title || 'New Course (Draft)'}</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-300 font-mono">DRAFT</span>
                 </div>
@@ -434,9 +595,9 @@ export default function AdminDashboard() {
                 <button
                   key={c.id}
                   onClick={() => handleSelectCourse(c.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs truncate transition-all cursor-pointer flex items-center justify-between ${
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs truncate transition-all cursor-pointer flex items-center justify-between ${
                     c.id === activeCourseId && !isCreatingNew
-                      ? 'bg-slate-800/80 text-white font-semibold border border-slate-700/60 shadow-sm'
+                      ? 'bg-slate-800/90 text-white font-semibold border border-slate-700/60 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
                   }`}
                 >
@@ -459,17 +620,17 @@ export default function AdminDashboard() {
       </aside>
 
       {/* ========================================================================= */}
-      {/* MAIN CONTENT CANVAS (Two-Column Course Studio Matching Reference) */}
+      {/* MAIN CONTENT CANVAS */}
       {/* ========================================================================= */}
       <main className="flex-1 min-w-0 p-4 sm:p-8 overflow-y-auto">
         
         {loading && !activeCourse && !isCreatingNew ? (
           <div className="py-24 text-center space-y-3">
-            <div className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto" />
+            <Loader2 className="w-7 h-7 text-indigo-400 animate-spin mx-auto" />
             <p className="text-xs text-slate-500">Loading course studio...</p>
           </div>
         ) : !activeCourse && !isCreatingNew ? (
-          /* Empty State: Prompt to create first course */
+          /* Empty State */
           <div className="max-w-xl mx-auto py-24 text-center space-y-5">
             <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(99,102,241,0.2)]">
               <Layers className="w-8 h-8" />
@@ -480,13 +641,14 @@ export default function AdminDashboard() {
                 Create a course to set up your title, URL slug, Polar product ID, curriculum modules, and video streaming.
               </p>
             </div>
-            <button
+            <Button
               onClick={handleStartCreateCourse}
-              className="px-5 py-2.5 rounded-xl text-xs font-semibold border border-indigo-500/40 bg-[#121936] text-indigo-100 hover:bg-[#182147] shadow-[0_0_20px_rgba(99,102,241,0.25)] transition-all cursor-pointer inline-flex items-center gap-2"
+              variant="primary"
+              size="md"
+              leftIcon={<Plus className="w-4 h-4" />}
             >
-              <Plus className="w-3.5 h-3.5" />
               Create Course
-            </button>
+            </Button>
           </div>
         ) : (
           /* Two-Column Studio Layout */
@@ -502,9 +664,9 @@ export default function AdminDashboard() {
                 <Link
                   to={formData.slug ? `/courses/${formData.slug}` : '/courses'}
                   target="_blank"
-                  className="text-xs text-slate-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                  className="text-xs text-slate-400 hover:text-indigo-300 flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Eye className="w-3 h-3" />
+                  <Eye className="w-3.5 h-3.5" />
                   <span>Public View</span>
                 </Link>
               </div>
@@ -512,7 +674,7 @@ export default function AdminDashboard() {
               {saveSuccess && (
                 <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
                   <Check className="w-3.5 h-3.5" />
-                  <span>Changes saved successfully</span>
+                  <span>Saved</span>
                 </div>
               )}
             </div>
@@ -541,7 +703,7 @@ export default function AdminDashboard() {
                     {/* Row 1: Title and Slug */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
                           <span>Title</span>
                           <span className="text-rose-400 font-bold">*</span>
                         </label>
@@ -558,13 +720,13 @@ export default function AdminDashboard() {
                               setFormData({ ...formData, title: newTitle });
                             }
                           }}
-                          placeholder="Claude Code Tutorial"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                          placeholder="Full-Stack Next.js 15 Mastery"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
                           <span>Slug</span>
                           <span className="text-rose-400 font-bold">*</span>
                         </label>
@@ -573,8 +735,8 @@ export default function AdminDashboard() {
                           required
                           value={formData.slug}
                           onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                          placeholder="claude-code-tutorial"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm font-mono text-xs placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                          placeholder="fullstack-nextjs-15"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm font-mono text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all"
                         />
                         <p className="text-[11px] text-slate-500 font-mono">
                           /courses/{formData.slug || 'slug'}
@@ -585,7 +747,7 @@ export default function AdminDashboard() {
                     {/* Row 2: Category and Price */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300">
+                        <label className="text-xs font-semibold text-slate-300">
                           Category
                         </label>
                         <input
@@ -594,7 +756,7 @@ export default function AdminDashboard() {
                           value={formData.category}
                           onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                           placeholder="e.g. Full-Stack, Backend, AI"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all"
                         />
                         <datalist id="category-suggestions">
                           <option value="Full-Stack" />
@@ -609,7 +771,7 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300">
+                        <label className="text-xs font-semibold text-slate-300">
                           Price (INR ₹)
                         </label>
                         <input
@@ -619,7 +781,7 @@ export default function AdminDashboard() {
                           value={formData.price}
                           onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                           placeholder="2499"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors font-mono"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all font-mono"
                         />
                         <p className="text-[11px] text-slate-500 leading-tight">
                           Course price shown on the card (set 0 for Free).
@@ -630,7 +792,7 @@ export default function AdminDashboard() {
                     {/* Row 3: Tags & Level */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300">
+                        <label className="text-xs font-semibold text-slate-300">
                           Tags (comma-separated)
                         </label>
                         <input
@@ -638,7 +800,7 @@ export default function AdminDashboard() {
                           value={formData.tags}
                           onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                           placeholder="Next.js 15, Prisma, PostgreSQL"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors text-xs font-mono"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all text-xs font-mono"
                         />
                         <p className="text-[11px] text-slate-500 leading-tight">
                           Tech stack pills displayed on the course card.
@@ -646,13 +808,13 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300">
+                        <label className="text-xs font-semibold text-slate-300">
                           Difficulty Level
                         </label>
                         <select
                           value={formData.level}
                           onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-indigo-500/80 transition-colors cursor-pointer"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all cursor-pointer"
                         >
                           <option value="Beginner">Beginner</option>
                           <option value="Intermediate">Intermediate</option>
@@ -667,14 +829,14 @@ export default function AdminDashboard() {
                     {/* Row 4: Status & Polar Product ID */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+                        <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
                           <span>Status</span>
                           <span className="text-rose-400 font-bold">*</span>
                         </label>
                         <select
                           value={formData.status}
                           onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-indigo-500/80 transition-colors cursor-pointer"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all cursor-pointer"
                         >
                           <option value="draft">Draft</option>
                           <option value="published">Published</option>
@@ -687,17 +849,17 @@ export default function AdminDashboard() {
 
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-xs font-medium text-slate-300">
+                          <label className="text-xs font-semibold text-slate-300">
                             Polar product ID
                           </label>
-                          <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Optional</span>
                         </div>
                         <input
                           type="text"
                           value={formData.polar_product_id}
                           onChange={(e) => setFormData({ ...formData, polar_product_id: e.target.value })}
                           placeholder="Not linked yet"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm font-mono text-xs placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm font-mono text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all"
                         />
                         <p className="text-[11px] text-slate-400 leading-tight">
                           Leave blank if Polar product is not yet published. The course remains published and watchable by Monthly &amp; Lifetime members, with free preview lessons open to everyone. Add Polar Product ID when ready to allow single course purchase (~₹2,000).
@@ -705,20 +867,20 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Row 3: Description */}
+                    {/* Row 5: Description */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-medium text-slate-300">
+                        <label className="text-xs font-semibold text-slate-300">
                           Description
                         </label>
-                        <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                        <span className="text-[10px] text-slate-500 font-mono">Optional</span>
                       </div>
                       <textarea
                         rows={4}
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="The ultimate course tutorial that you need."
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors leading-relaxed"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all leading-relaxed"
                       />
                       <p className="text-[11px] text-slate-500">
                         Markdown. Shown on the course page.
@@ -727,15 +889,17 @@ export default function AdminDashboard() {
 
                     {/* Save / Create course button */}
                     <div className="pt-2">
-                      <button
+                      <Button
                         type="submit"
-                        disabled={savingChanges}
-                        className="px-5 py-2.5 rounded-xl text-xs font-semibold border border-indigo-500/40 bg-[#121936] text-indigo-100 hover:bg-[#182147] shadow-[0_0_20px_rgba(99,102,241,0.25)] transition-all cursor-pointer disabled:opacity-50"
+                        loading={savingChanges}
+                        variant="primary"
+                        size="md"
+                        leftIcon={<Check className="w-4 h-4" />}
                       >
                         {savingChanges 
                           ? (isCreatingNew ? 'Creating course...' : 'Saving changes...') 
                           : (isCreatingNew ? 'Create Course' : 'Save changes')}
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 </div>
@@ -751,7 +915,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Drag the handles to reorder. Click a lesson to edit it and upload its video.
+                    Click any lesson to edit details, add notes, and upload HLS video streaming.
                   </p>
 
                   {/* Sections List */}
@@ -780,7 +944,7 @@ export default function AdminDashboard() {
                             <div className="flex items-center justify-between text-xs text-slate-200">
                               <div className="flex items-center gap-2">
                                 <GripVertical className="w-4 h-4 text-slate-500 cursor-grab" />
-                                <span className="font-semibold text-white text-sm">
+                                <span className="font-bold text-white text-sm">
                                   {section.title}
                                 </span>
                               </div>
@@ -791,8 +955,8 @@ export default function AdminDashboard() {
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteSection(section.id)}
-                                  className="text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                                  onClick={() => requestDeleteSection(section.id)}
+                                  className="text-slate-500 hover:text-rose-400 transition-colors cursor-pointer p-1 rounded-md hover:bg-white/[0.04]"
                                   title="Delete Section"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -803,19 +967,20 @@ export default function AdminDashboard() {
                             {/* Lessons List Inside Section */}
                             <div className="space-y-2 pl-4">
                               {(section.lessons || []).map((lesson, lIdx) => (
-                                <div
+                                <motion.div
                                   key={lesson.id}
-                                  className="p-2.5 rounded-lg bg-[#0c1326] hover:bg-[#0f1830] border border-slate-800/80 hover:border-indigo-500/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs group"
+                                  whileHover={{ x: 2 }}
+                                  className="p-2.5 rounded-xl bg-[#0c1326] hover:bg-[#0f1830] border border-slate-800/80 hover:border-indigo-500/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs group"
                                 >
                                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                     <GripVertical className="w-3.5 h-3.5 text-slate-600 shrink-0 cursor-grab" />
                                     <Link
                                       to={`/admin/courses/${activeCourseId}/lessons/${lesson.id}`}
-                                      className="flex items-center gap-2.5 min-w-0 flex-1 text-slate-200 hover:text-indigo-300 transition-colors"
+                                      className="flex items-center gap-2.5 min-w-0 flex-1 text-slate-200 group-hover:text-indigo-300 transition-colors"
                                       title="Click to edit lesson & upload video"
                                     >
                                       <Video className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-400 shrink-0" />
-                                      <span className="font-medium truncate group-hover:text-indigo-300">
+                                      <span className="font-semibold truncate">
                                         {lIdx + 1}. {lesson.title}
                                       </span>
                                     </Link>
@@ -823,11 +988,11 @@ export default function AdminDashboard() {
 
                                   <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
                                     {lesson.is_free_preview && (
-                                      <span className="text-[10px] font-semibold text-indigo-300 bg-indigo-950/60 border border-indigo-800/40 px-1.5 py-0.5 rounded">
+                                      <span className="text-[10px] font-bold text-indigo-300 bg-indigo-950/60 border border-indigo-800/40 px-1.5 py-0.5 rounded">
                                         Free
                                       </span>
                                     )}
-                                    <span className="text-[10px] font-semibold text-slate-400 bg-slate-800/60 px-1.5 py-0.5 rounded capitalize">
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-800/60 px-1.5 py-0.5 rounded capitalize">
                                       {lesson.status || 'Draft'}
                                     </span>
                                     <span className="text-slate-500 text-[11px] font-mono">
@@ -837,7 +1002,7 @@ export default function AdminDashboard() {
                                     </span>
 
                                     {/* Video upload trigger */}
-                                    <label className="text-[11px] text-slate-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer">
+                                    <label className="text-[11px] font-medium text-slate-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer px-2 py-1 rounded bg-slate-800/40 hover:bg-slate-800 transition-colors">
                                       <Upload className="w-3 h-3" />
                                       <span>
                                         {uploadingLessonVideoId === lesson.id ? 'Uploading...' : 'Video'}
@@ -855,13 +1020,13 @@ export default function AdminDashboard() {
 
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteLesson(lesson.id)}
-                                      className="text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                                      onClick={() => requestDeleteLesson(lesson.id)}
+                                      className="text-slate-500 hover:text-rose-400 transition-colors cursor-pointer p-1"
                                     >
-                                      <Trash2 className="w-3 h-3" />
+                                      <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
-                                </div>
+                                </motion.div>
                               ))}
 
                               {/* New Lesson Input for this section */}
@@ -882,16 +1047,17 @@ export default function AdminDashboard() {
                                       handleAddLesson(section.id);
                                     }
                                   }}
-                                  className="flex-1 px-3 py-1.5 rounded-lg bg-[#070b14] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                                  className="flex-1 px-3 py-2 rounded-xl bg-[#070b14] border border-slate-800/90 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all"
                                 />
-                                <button
-                                  type="button"
-                                  disabled={addingLessonSectionId === section.id}
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  loading={addingLessonSectionId === section.id}
                                   onClick={() => handleAddLesson(section.id)}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700/80 bg-[#131b2e]/70 hover:bg-[#18233c] text-slate-200 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+                                  className="text-xs shrink-0"
                                 >
-                                  {addingLessonSectionId === section.id ? '+ Adding...' : '+ Add lesson'}
-                                </button>
+                                  + Add lesson
+                                </Button>
                               </div>
                             </div>
 
@@ -901,21 +1067,24 @@ export default function AdminDashboard() {
                     )}
 
                     {/* New Section Input at bottom */}
-                    <form onSubmit={handleAddSection} className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+                    <form onSubmit={handleAddSection} className="flex items-center gap-2 pt-3 border-t border-slate-800/80">
                       <input
                         type="text"
                         placeholder="New section title"
                         value={newSectionTitle}
                         onChange={(e) => setNewSectionTitle(e.target.value)}
-                        className="flex-1 px-3.5 py-2 rounded-xl bg-[#0c1326] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 transition-colors"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/80 transition-all"
                       />
-                      <button
+                      <Button
                         type="submit"
-                        disabled={addingSection || !newSectionTitle.trim()}
-                        className="px-3.5 py-2 rounded-xl text-xs font-medium border border-slate-700/80 bg-[#131b2e]/70 hover:bg-[#18233c] text-slate-200 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+                        variant="secondary"
+                        size="sm"
+                        loading={addingSection}
+                        disabled={!newSectionTitle.trim()}
+                        className="text-xs shrink-0"
                       >
-                        {addingSection ? '+ Adding...' : '+ Add section'}
-                      </button>
+                        + Add section
+                      </Button>
                     </form>
 
                   </div>
@@ -934,7 +1103,7 @@ export default function AdminDashboard() {
                     <h3 className="text-sm font-bold text-white">
                       Thumbnail
                     </h3>
-                    <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Optional</span>
                   </div>
 
                   {formData.thumbnail_url ? (
@@ -956,9 +1125,16 @@ export default function AdminDashboard() {
                     16:9, at least 1280×720. Public.
                   </p>
 
-                  <label className="w-full py-2 px-3 rounded-xl text-xs font-semibold border border-slate-700/80 bg-[#131b2e]/60 hover:bg-[#18233c] text-slate-200 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm">
-                    <Upload className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{uploadingThumbnail ? 'Uploading to ImageKit...' : 'Replace thumbnail'}</span>
+                  <label className="w-full">
+                    <span className="sr-only">Upload thumbnail</span>
+                    <div className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]">
+                      {uploadingThumbnail ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      <span>{uploadingThumbnail ? 'Uploading to ImageKit...' : 'Replace thumbnail'}</span>
+                    </div>
                     <input
                       type="file"
                       accept="image/*"
@@ -975,7 +1151,7 @@ export default function AdminDashboard() {
                     <h3 className="text-sm font-bold text-white">
                       Trailer
                     </h3>
-                    <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                    <span className="text-[10px] text-slate-500 font-mono">Optional</span>
                   </div>
 
                   {formData.trailer_url ? (
@@ -997,9 +1173,16 @@ export default function AdminDashboard() {
                     Plays on the course page. Public.
                   </p>
 
-                  <label className="w-full py-2 px-3 rounded-xl text-xs font-semibold border border-slate-700/80 bg-[#131b2e]/60 hover:bg-[#18233c] text-slate-200 transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm">
-                    <Upload className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{uploadingTrailer ? 'Uploading Trailer...' : 'Replace trailer'}</span>
+                  <label className="w-full">
+                    <span className="sr-only">Upload trailer</span>
+                    <div className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]">
+                      {uploadingTrailer ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                      <span>{uploadingTrailer ? 'Uploading Trailer...' : 'Replace trailer'}</span>
+                    </div>
                     <input
                       type="file"
                       accept="video/*"
@@ -1022,25 +1205,27 @@ export default function AdminDashboard() {
                   </p>
 
                   {isCreatingNew ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full text-center"
                       onClick={() => {
                         setIsCreatingNew(false);
                         if (courses.length > 0) handleSelectCourse(courses[0].id);
                       }}
-                      className="w-full py-2 px-3 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-300 transition-colors cursor-pointer"
                     >
                       Cancel Draft
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCourse(activeCourse?.id)}
-                      className="w-full py-2 px-3 rounded-xl text-xs font-semibold border border-rose-500/30 bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      className="w-full text-center"
+                      onClick={() => requestDeleteCourse(activeCourse?.id)}
+                      leftIcon={<Trash2 className="w-3.5 h-3.5" />}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Delete course</span>
-                    </button>
+                      Delete course
+                    </Button>
                   )}
                 </div>
 

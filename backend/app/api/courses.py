@@ -14,6 +14,7 @@ router = APIRouter(prefix="/courses", tags=["Public Courses"])
 async def get_public_courses(db: AsyncSession = Depends(get_db)):
     """
     Get all published courses for the public catalog.
+    Strictly filters out draft and archived courses.
     """
     stmt = (
         select(Course)
@@ -85,10 +86,12 @@ async def get_public_courses(db: AsyncSession = Depends(get_db)):
 async def get_public_course_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     """
     Get a single published course by its URL slug.
+    IDOR / Information disclosure protection: strictly filters by status == 'published'.
     """
+    clean_slug = slug.strip().lower()
     stmt = (
         select(Course)
-        .where(Course.slug == slug)
+        .where(Course.slug == clean_slug, Course.status == "published")
         .options(
             selectinload(Course.sections).selectinload(Section.lessons),
             selectinload(Course.access_records),
@@ -97,7 +100,7 @@ async def get_public_course_by_slug(slug: str, db: AsyncSession = Depends(get_db
     result = await db.execute(stmt)
     c = result.scalar_one_or_none()
     if not c:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Course not found or is currently private.")
 
     lessons_count = sum(len(s.lessons) for s in c.sections)
     total_duration_sec = sum(

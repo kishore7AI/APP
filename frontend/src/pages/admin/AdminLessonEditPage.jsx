@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, Layers, ExternalLink, ArrowLeft, 
   Video, Upload, Trash2, Check, AlertCircle, Shield, 
-  Eye, VideoOff, ChevronRight
+  Eye, VideoOff, ChevronRight, Loader2
 } from 'lucide-react';
-import { adminApi } from '../../api/client';
+import { adminApi, authApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import ImageKitPlayer from '../../components/video/ImageKitPlayer';
+import Button from '../../components/ui/Button';
 
 export default function AdminLessonEditPage() {
   const { courseId, lessonId } = useParams();
@@ -50,7 +52,41 @@ export default function AdminLessonEditPage() {
       try {
         setLoading(true);
         setErrorMsg('');
-        const data = await adminApi.getLesson(lessonId);
+
+        if (!localStorage.getItem('nxtlearnn_token') && user?.email) {
+          try {
+            const syncRes = await authApi.syncSession({
+              email: user.email,
+              full_name: user.name || user.full_name,
+              avatar_url: user.image || user.avatar_url,
+            });
+            if (syncRes?.access_token) {
+              localStorage.setItem('nxtlearnn_token', syncRes.access_token);
+            }
+          } catch (e) {}
+        }
+
+        let data;
+        try {
+          data = await adminApi.getLesson(lessonId);
+        } catch (firstErr) {
+          if (user?.email && (firstErr.message?.includes('credentials') || firstErr.message?.includes('token'))) {
+            const syncRes = await authApi.syncSession({
+              email: user.email,
+              full_name: user.name || user.full_name,
+              avatar_url: user.image || user.avatar_url,
+            });
+            if (syncRes?.access_token) {
+              localStorage.setItem('nxtlearnn_token', syncRes.access_token);
+              data = await adminApi.getLesson(lessonId);
+            } else {
+              throw firstErr;
+            }
+          } else {
+            throw firstErr;
+          }
+        }
+
         if (data && isMounted) {
           setLessonData({
             title: data.title || '',
@@ -79,7 +115,7 @@ export default function AdminLessonEditPage() {
 
     fetchLesson();
     return () => { isMounted = false; };
-  }, [lessonId, courseId]);
+  }, [lessonId, courseId, user?.email]);
 
   // Handle Title Change & Auto-slug generator
   const handleTitleChange = (e) => {
@@ -98,7 +134,7 @@ export default function AdminLessonEditPage() {
   const handleSaveChanges = async (e) => {
     if (e) e.preventDefault();
     if (!lessonData.title.trim()) {
-      alert('Lesson title is required.');
+      setErrorMsg('Lesson title is required.');
       return;
     }
 
@@ -449,22 +485,15 @@ export default function AdminLessonEditPage() {
 
               {/* Save Button */}
               <div className="pt-2 flex items-center gap-3">
-                <button
+                <Button
                   type="submit"
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                  loading={saving}
+                  variant="primary"
+                  size="md"
+                  leftIcon={saveSuccess ? <Check className="w-4 h-4 text-emerald-300" /> : undefined}
                 >
-                  {saving ? (
-                    <span>Saving...</span>
-                  ) : saveSuccess ? (
-                    <>
-                      <Check className="w-4 h-4 text-emerald-300" />
-                      <span>Changes Saved!</span>
-                    </>
-                  ) : (
-                    <span>Save changes</span>
-                  )}
-                </button>
+                  {saving ? 'Saving...' : saveSuccess ? 'Changes Saved!' : 'Save changes'}
+                </Button>
               </div>
 
             </form>
@@ -539,14 +568,15 @@ export default function AdminLessonEditPage() {
                 Removes the lesson and its video from ImageKit.
               </p>
 
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="sm"
+                className="w-full text-center"
                 onClick={() => setShowDeleteModal(true)}
-                className="w-full py-2.5 px-4 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete lesson</span>
-              </button>
+                Delete lesson
+              </Button>
             </div>
 
           </div>
@@ -556,35 +586,43 @@ export default function AdminLessonEditPage() {
       </main>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="max-w-md w-full rounded-2xl bg-[#0a0f20] border border-red-500/30 p-6 space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-white">
-              Delete "{lessonData.title}"?
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Are you sure you want to delete this lesson? This action will permanently remove the lesson and its video records.
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={handleDeleteLesson}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 shadow-lg shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Yes, Delete'}
-              </button>
-            </div>
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="max-w-md w-full rounded-2xl bg-[#080d1a] border border-rose-500/30 p-6 space-y-4 shadow-2xl"
+            >
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400" />
+                <span>Delete "{lessonData.title}"?</span>
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Are you sure you want to delete this lesson? This action will permanently remove the lesson and its video records.
+              </p>
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800/80">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={deleting}
+                  onClick={handleDeleteLesson}
+                >
+                  {deleting ? 'Deleting...' : 'Yes, Delete'}
+                </Button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
     </div>
   );

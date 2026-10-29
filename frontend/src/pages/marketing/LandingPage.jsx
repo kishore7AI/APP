@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, ArrowRight, Play, CheckCircle2, ShieldCheck, 
   Terminal, Layers, Code, Zap, Video, Star, Compass,
@@ -8,6 +9,7 @@ import {
   Maximize2, Check, ChevronRight, Folder, Search
 } from 'lucide-react';
 import { TestimonialsSection } from '../../components/ui/testimonial-v2';
+import Button from '../../components/ui/Button';
 
 export default function LandingPage() {
   const [activeLessonId, setActiveLessonId] = useState(7);
@@ -203,21 +205,25 @@ export default function LandingPage() {
         </div>
 
         {/* Dual Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-1">
-          <Link
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-1">
+          <Button
             to="/courses"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-bold text-sm text-white bg-slate-950 hover:bg-slate-800 dark:text-[#02050e] dark:bg-white dark:hover:bg-slate-100 shadow-xl shadow-slate-900/10 dark:shadow-[0_0_28px_rgba(255,255,255,0.45)] hover:dark:shadow-[0_0_45px_rgba(255,255,255,0.65)] transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            variant="primary"
+            size="lg"
+            className="w-full sm:w-auto rounded-full px-8 py-3.5 text-sm font-bold shadow-xl"
+            rightIcon={<ArrowRight className="w-4 h-4" />}
           >
-            <span>Browse Courses</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+            Browse Courses
+          </Button>
 
-          <Link
+          <Button
             to="/pricing"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 rounded-full font-semibold text-sm text-slate-800 bg-white/80 hover:bg-white border border-slate-300/80 dark:text-slate-200 dark:bg-white/10 dark:hover:bg-white/15 dark:border-white/20 backdrop-blur-md shadow-sm transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            variant="secondary"
+            size="lg"
+            className="w-full sm:w-auto rounded-full px-8 py-3.5 text-sm font-semibold"
           >
             View Pricing
-          </Link>
+          </Button>
         </div>
 
         {/* Developer Avatars & 5-Star Social Proof (Added below the buttons) */}
@@ -499,21 +505,23 @@ export default function LandingPage() {
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2.5 pt-1">
-                  <button
+                  <Button
                     onClick={() => toggleComplete(activeLessonId)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/25 transition-all cursor-pointer"
+                    variant={completedLessons.has(activeLessonId) ? 'secondary' : 'primary'}
+                    size="sm"
+                    leftIcon={<Check className="w-3.5 h-3.5" />}
                   >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>{completedLessons.has(activeLessonId) ? 'Completed' : 'Mark complete'}</span>
-                  </button>
+                    {completedLessons.has(activeLessonId) ? 'Completed' : 'Mark complete'}
+                  </Button>
 
-                  <button
+                  <Button
                     onClick={() => setActiveLessonId(nextLessonId)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-white/15 transition-all cursor-pointer"
+                    variant="glass"
+                    size="sm"
+                    rightIcon={<ChevronRight className="w-3.5 h-3.5" />}
                   >
-                    <span>Next lesson</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+                    Next lesson
+                  </Button>
                 </div>
 
                 {/* Tabs: Overview & Resources */}
@@ -975,29 +983,40 @@ export default function LandingPage() {
 
         <div className="space-y-4">
           {faqs.map((faq, idx) => (
-            <div
+            <motion.div
               key={idx}
+              whileHover={{ y: -1 }}
               onClick={() => toggleFaq(idx)}
-              className="p-6 rounded-2xl bg-white dark:bg-[#090f20]/80 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 shadow-sm dark:shadow-none transition-all cursor-pointer"
+              className="p-6 rounded-2xl bg-white dark:bg-[#080d1a]/95 border border-slate-200 dark:border-white/[0.08] hover:border-indigo-500/40 shadow-sm dark:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.3)] transition-all cursor-pointer overflow-hidden"
             >
               <div className="flex items-center justify-between gap-4">
                 <h3 className="font-semibold text-base text-slate-900 dark:text-white flex items-center gap-3">
-                  <HelpCircle className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
-                  {faq.q}
+                  <HelpCircle className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                  <span>{faq.q}</span>
                 </h3>
                 <ChevronDown
-                  className={`w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform duration-200 shrink-0 ${
-                    openFaq === idx ? 'rotate-180 text-sky-500 dark:text-sky-400' : ''
+                  className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${
+                    openFaq === idx ? 'rotate-180 text-indigo-400' : ''
                   }`}
                 />
               </div>
 
-              {openFaq === idx && (
-                <p className="pt-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed pl-7 border-t border-slate-100 dark:border-white/5 mt-4">
-                  {faq.a}
-                </p>
-              )}
-            </div>
+              <AnimatePresence>
+                {openFaq === idx && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <p className="pt-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed pl-7 border-t border-slate-100 dark:border-white/[0.06] mt-4">
+                      {faq.a}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           ))}
         </div>
       </section>
@@ -1023,21 +1042,25 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-            <Link
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
+            <Button
               to="/signup"
-              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 rounded-full font-bold text-sm text-white bg-slate-950 hover:bg-slate-800 dark:text-[#02050e] dark:bg-white dark:hover:bg-slate-100 shadow-xl shadow-slate-900/15 dark:shadow-[0_0_28px_rgba(255,255,255,0.4)] transition-all cursor-pointer"
+              variant="primary"
+              size="lg"
+              className="w-full sm:w-auto rounded-full px-8 py-3.5 text-sm font-bold shadow-xl"
             >
               Get Started Now
-            </Link>
+            </Button>
 
-            <Link
+            <Button
               to="/pricing"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full font-medium text-sm text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-sm dark:text-slate-200 dark:bg-white/[0.06] dark:hover:bg-white/[0.12] dark:border-white/20 transition-all cursor-pointer"
+              variant="secondary"
+              size="lg"
+              className="w-full sm:w-auto rounded-full px-8 py-3.5 text-sm font-semibold"
+              rightIcon={<ArrowRight className="w-4 h-4" />}
             >
               Compare All Access Plans
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            </Button>
           </div>
         </div>
       </section>

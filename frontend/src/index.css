@@ -4,10 +4,24 @@
 
 :root {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --color-primary: #6366f1;
+  --color-primary-hover: #4f46e5;
+  --surface-base: #02050e;
+  --surface-card: #080d1a;
+  --surface-card-hover: #0d152a;
+  --surface-input: #0c1326;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-card: rgba(148, 163, 184, 0.12);
 }
 
 code, pre {
   font-family: 'JetBrains Mono', monospace;
+}
+
+/* Accessible focus ring */
+:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
 }
 
 /* Ensure all buttons, links, and interactive elements show the pointer cursor */
@@ -22,10 +36,15 @@ summary,
   cursor: pointer !important;
 }
 
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
@@ -33,10 +52,80 @@ summary,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.3);
+  background: rgba(148, 163, 184, 0.2);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.5);
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* Professional Button Utilities */
+@layer components {
+  /* Solid Primary Button */
+  .btn-pro-primary {
+    @apply inline-flex items-center justify-center gap-2 font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all duration-200 ease-out select-none cursor-pointer;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  .btn-pro-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+  }
+  .btn-pro-primary:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Glass/Secondary Button */
+  .btn-pro-secondary {
+    @apply inline-flex items-center justify-center gap-2 font-semibold text-slate-200 hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] hover:border-white/[0.2] rounded-xl transition-all duration-200 ease-out select-none cursor-pointer backdrop-blur-md;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  .btn-pro-secondary:hover {
+    transform: translateY(-1px);
+  }
+  .btn-pro-secondary:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* Ghost Button */
+  .btn-pro-ghost {
+    @apply inline-flex items-center justify-center gap-2 font-medium text-slate-400 hover:text-white hover:bg-white/[0.06] rounded-xl transition-all duration-150 ease-out select-none cursor-pointer;
+  }
+  .btn-pro-ghost:active {
+    transform: scale(0.98);
+  }
+
+  /* Pro Card Container */
+  .pro-card {
+    @apply bg-[#080d1a]/95 backdrop-blur-xl border border-slate-800/80 rounded-2xl transition-all duration-300;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+  }
+  .pro-card-hover {
+    @apply pro-card hover:border-indigo-500/40 hover:bg-[#0b1224]/95;
+  }
+  .pro-card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.5), 0 0 24px rgba(99, 102, 241, 0.12);
+  }
+
+  /* Input fields */
+  .pro-input {
+    @apply w-full px-3.5 py-2.5 rounded-xl bg-[#0c1326] border border-slate-800/90 text-slate-100 placeholder-slate-500 text-sm transition-all duration-150;
+  }
+  .pro-input:focus {
+    @apply outline-none border-indigo-500/80;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

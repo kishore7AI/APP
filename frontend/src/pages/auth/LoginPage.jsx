@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { Sparkles, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { COURSES } from '../../data/coursesData';
+import Button from '../../components/ui/Button';
 
 // Clean SVG Icons for Google and GitHub
 function GoogleIcon({ className = "w-4 h-4" }) {
@@ -130,39 +132,37 @@ export default function LoginPage() {
 
           {/* Social OAuth Providers (Google & GitHub) */}
           <div className="space-y-2.5">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
+              className="w-full text-center"
               onClick={() => handleSocialAuth('google')}
               disabled={isSubmitting || socialLoading !== null}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-white dark:bg-[#030612] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
+              loading={socialLoading === 'google'}
+              leftIcon={<GoogleIcon className="w-4 h-4" />}
             >
-              {socialLoading === 'google' ? (
-                <Loader2 className="w-4 h-4 animate-spin text-sky-500" />
-              ) : (
-                <GoogleIcon className="w-4 h-4" />
-              )}
-              <span>Continue with Google</span>
-            </button>
+              Continue with Google
+            </Button>
 
-            <button
+            <Button
               type="button"
+              variant="glass"
+              size="md"
+              className="w-full text-center"
               onClick={() => handleSocialAuth('github')}
               disabled={isSubmitting || socialLoading !== null}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-[#24292e] hover:bg-[#1b1f23] text-white border border-black/20 shadow-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
+              loading={socialLoading === 'github'}
+              leftIcon={<GitHubIcon className="w-4 h-4" />}
             >
-              {socialLoading === 'github' ? (
-                <Loader2 className="w-4 h-4 animate-spin text-white" />
-              ) : (
-                <GitHubIcon className="w-4 h-4 text-white" />
-              )}
-              <span>Continue with GitHub</span>
-            </button>
+              Continue with GitHub
+            </Button>
           </div>
 
           {/* Divider */}
           <div className="relative flex items-center justify-center">
             <div className="w-full border-t border-slate-200 dark:border-white/10" />
-            <span className="absolute px-3 bg-white dark:bg-[#060b19] text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <span className="absolute px-3 bg-white dark:bg-[#060b19] text-[11px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
               Or email
             </span>
           </div>
@@ -181,7 +181,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   disabled={isSubmitting}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#030612] border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50 text-slate-900 dark:text-white placeholder-slate-400 disabled:opacity-50 transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#030612] border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-white placeholder-slate-400 disabled:opacity-50 transition-colors"
                 />
               </div>
             </div>
@@ -198,28 +198,21 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   disabled={isSubmitting}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#030612] border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50 text-slate-900 dark:text-white placeholder-slate-400 disabled:opacity-50 transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#030612] border border-slate-200 dark:border-white/10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-900 dark:text-white placeholder-slate-400 disabled:opacity-50 transition-colors"
                 />
               </div>
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-sky-400 via-sky-500 to-indigo-600 hover:from-sky-300 hover:to-indigo-500 shadow-lg shadow-sky-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+              variant="primary"
+              size="lg"
+              loading={isSubmitting}
+              className="w-full text-center"
+              rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+              Sign In
+            </Button>
           </form>
 
           {/* Footer Link */}

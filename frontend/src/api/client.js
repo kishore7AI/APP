@@ -45,6 +45,12 @@ export const authApi = {
     apiRequest('/auth/me', {
       method: 'GET',
     }),
+
+  syncSession: (payload) =>
+    apiRequest('/auth/sync', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export const coursesApi = {

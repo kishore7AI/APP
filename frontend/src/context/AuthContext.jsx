@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authClient } from '../auth';
+import { authApi } from '../api/client';
 
 const SAVED_ACCOUNTS_KEY = 'nxtlearnn_saved_accounts';
 const ACTIVE_USER_KEY = 'nxtlearnn_active_user';
@@ -67,6 +68,18 @@ export function AuthProvider({ children }) {
           setUser(result.data.user);
           saveAccountToDevice(result.data.user);
           localStorage.setItem(ACTIVE_USER_KEY, JSON.stringify(result.data.user));
+
+          // Ensure backend JWT token is synced for API calls
+          const userEmail = result.data.user.email;
+          if (userEmail) {
+            authApi.syncSession({
+              email: userEmail,
+              full_name: result.data.user.name || result.data.user.full_name,
+              avatar_url: result.data.user.image || result.data.user.avatar_url,
+            })
+              .then((res) => { if (res?.access_token) localStorage.setItem('nxtlearnn_token', res.access_token); })
+              .catch((err) => console.warn('Token sync notice:', err?.message));
+          }
           return;
         }
 
@@ -77,6 +90,15 @@ export function AuthProvider({ children }) {
           if (parsed && parsed.email) {
             setUser(parsed);
             setSession({ user: parsed, expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() });
+
+            // Ensure backend JWT token is synced
+            authApi.syncSession({
+              email: parsed.email,
+              full_name: parsed.name || parsed.full_name,
+              avatar_url: parsed.image || parsed.avatar_url,
+            })
+              .then((res) => { if (res?.access_token) localStorage.setItem('nxtlearnn_token', res.access_token); })
+              .catch((err) => console.warn('Token sync notice:', err?.message));
           }
         }
       } catch (err) {
@@ -112,8 +134,22 @@ export function AuthProvider({ children }) {
     const newUser = sessionResult?.data?.user || result?.data?.user || {
       name: fullName,
       email: cleanEmail,
-      role: cleanEmail.startsWith('admin@') ? 'admin' : 'student',
+      role: 'student',
     };
+
+    // Sync with FastAPI backend API
+    try {
+      const backendRes = await authApi.signup({
+        email: cleanEmail,
+        password,
+        full_name: fullName || cleanEmail.split('@')[0] || 'Student',
+      });
+      if (backendRes?.access_token) {
+        localStorage.setItem('nxtlearnn_token', backendRes.access_token);
+      }
+    } catch (e) {
+      console.warn('Backend signup sync notice:', e?.message);
+    }
 
     setSession(sessionResult?.data?.session || { user: newUser });
     setUser(newUser);
@@ -133,6 +169,16 @@ export function AuthProvider({ children }) {
 
     if (result?.error) {
       throw new Error(result.error.message || 'Login failed');
+    }
+
+    // Sync with FastAPI backend to receive JWT token
+    try {
+      const backendRes = await authApi.login({ email: cleanEmail, password });
+      if (backendRes?.access_token) {
+        localStorage.setItem('nxtlearnn_token', backendRes.access_token);
+      }
+    } catch (e) {
+      console.warn('Backend login sync notice:', e?.message);
     }
 
     // Refresh session state
@@ -162,6 +208,22 @@ export function AuthProvider({ children }) {
       email: savedAccount.email.toLowerCase(),
       lastLogin: new Date().toISOString(),
     };
+
+    // Ensure backend token is available for the account
+    if (cleanAccount.email) {
+      try {
+        const backendRes = await authApi.syncSession({
+          email: cleanAccount.email,
+          full_name: cleanAccount.name,
+          avatar_url: cleanAccount.image,
+        });
+        if (backendRes?.access_token) {
+          localStorage.setItem('nxtlearnn_token', backendRes.access_token);
+        }
+      } catch (e) {
+        console.warn('Saved account token sync notice:', e?.message);
+      }
+    }
 
     setUser(cleanAccount);
     setSession({
@@ -207,6 +269,7 @@ export function AuthProvider({ children }) {
       console.warn('Neon Better Auth signout notice:', e);
     } finally {
       localStorage.removeItem(ACTIVE_USER_KEY);
+      localStorage.removeItem('nxtlearnn_token');
       setSession(null);
       setUser(null);
     }

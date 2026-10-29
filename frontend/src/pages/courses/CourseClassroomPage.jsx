@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, Play, Pause, CheckCircle2, Circle, Lock, 
   Search, Volume2, Maximize2, Check, ChevronRight, ChevronLeft,
@@ -10,6 +11,7 @@ import { COURSES } from '../../data/coursesData';
 import { coursesApi } from '../../api/client';
 import { useEnrollment } from '../../hooks/useEnrollment';
 import { useAuth } from '../../context/AuthContext';
+import Button from '../../components/ui/Button';
 
 export default function CourseClassroomPage() {
   const { slug } = useParams();
@@ -550,37 +552,37 @@ export default function CourseClassroomPage() {
                 </div>
 
                 {/* Mark Complete & Next Lesson Buttons */}
-                <div className="flex items-center gap-2.5">
-                  <button
+                <div className="flex items-center gap-2">
+                  <Button
                     onClick={() => activeLesson?.id && toggleComplete(activeLesson.id)}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      activeLesson?.id && completedLessons.has(activeLesson.id)
-                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/25'
-                        : 'bg-sky-500 hover:bg-sky-400 text-white shadow-md shadow-sky-500/25'
-                    }`}
+                    variant={activeLesson?.id && completedLessons.has(activeLesson.id) ? 'secondary' : 'primary'}
+                    size="sm"
+                    leftIcon={<Check className="w-4 h-4 text-emerald-400" />}
                   >
-                    <Check className="w-4 h-4" />
-                    <span>{activeLesson?.id && completedLessons.has(activeLesson.id) ? 'Completed' : 'Mark Complete'}</span>
-                  </button>
+                    {activeLesson?.id && completedLessons.has(activeLesson.id) ? 'Completed' : 'Mark Complete'}
+                  </Button>
 
                   {prevLesson && (
-                    <button
+                    <Button
+                      variant="glass"
+                      size="sm"
                       onClick={() => handleLessonClick(prevLesson)}
-                      className="p-2 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 transition-colors cursor-pointer"
                       title="Previous lesson"
+                      className="px-2.5"
                     >
                       <ChevronLeft className="w-4 h-4" />
-                    </button>
+                    </Button>
                   )}
 
                   {nextLesson && (
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => handleLessonClick(nextLesson)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/15 transition-all cursor-pointer"
+                      rightIcon={<ChevronRight className="w-4 h-4" />}
                     >
-                      <span>Next lesson</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                      Next lesson
+                    </Button>
                   )}
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useEnrollment } from '../../hooks/useEnrollment';
 import { coursesApi } from '../../api/client';
@@ -7,6 +8,7 @@ import {
   PlayCircle, Clock, BookOpen, ArrowRight, Award, 
   Sparkles, CheckCircle2, ChevronRight, Compass, ShieldCheck 
 } from 'lucide-react';
+import Button from '../../components/ui/Button';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -100,13 +102,14 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <Link
+        <Button
           to="/courses"
-          className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors self-start shadow-sm"
+          variant="secondary"
+          size="sm"
+          leftIcon={<BookOpen className="w-4 h-4 text-indigo-400" />}
         >
-          <BookOpen className="w-4 h-4 text-brand-400" />
           Browse More Courses
-        </Link>
+        </Button>
       </div>
 
       {loading ? (
@@ -162,27 +165,29 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="pt-2 flex items-center gap-3">
-                  <Link
+                  <Button
                     to={`/courses/${inProgressCourse.slug}/learn`}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-500/25 transition-all cursor-pointer active:scale-95"
+                    variant="primary"
+                    size="md"
+                    rightIcon={<ArrowRight className="w-4 h-4" />}
                   >
                     Resume Lesson
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
+                  </Button>
 
-                  <Link
+                  <Button
                     to={`/courses/${inProgressCourse.slug}`}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-xs text-gray-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 transition-colors"
+                    variant="secondary"
+                    size="sm"
                   >
                     Course Overview
-                  </Link>
+                  </Button>
                 </div>
               </div>
             </div>
           ) : (
             /* Empty State when student has no active enrollments yet */
             <div className="rounded-3xl p-8 sm:p-10 bg-gradient-to-br from-slate-900/60 via-[#0b101e] to-slate-900/60 border border-slate-800 shadow-xl text-center space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                 <Compass className="w-8 h-8" />
               </div>
               <div className="max-w-md mx-auto space-y-2">
@@ -192,13 +197,14 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="pt-2">
-                <Link
+                <Button
                   to="/courses"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-500/25 transition-all"
+                  variant="primary"
+                  size="md"
+                  leftIcon={<Sparkles className="w-4 h-4" />}
                 >
-                  <Sparkles className="w-4 h-4" />
                   Explore Course Catalog
-                </Link>
+                </Button>
               </div>
             </div>
           )}

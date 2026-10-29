@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Check, Sparkles, HelpCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useEnrollment } from '../../hooks/useEnrollment';
+import Button from '../../components/ui/Button';
 
 export default function PricingPage() {
   const navigate = useNavigate();
@@ -96,17 +98,21 @@ export default function PricingPage() {
 
       {/* Pricing Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-        {plans.map((plan) => (
-          <div
+        {plans.map((plan, idx) => (
+          <motion.div
             key={plan.name}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: idx * 0.08 }}
+            whileHover={{ y: -5 }}
             className={`relative flex flex-col justify-between p-8 rounded-3xl transition-all duration-300 ${
               plan.popular
-                ? 'bg-gradient-to-b from-brand-50 via-white to-white dark:from-brand-950/30 dark:via-[#121824] dark:to-[#121824] border-2 border-brand-500 shadow-2xl shadow-brand-500/10 md:-translate-y-2'
-                : 'bg-white dark:bg-[#121824] border border-gray-200 dark:border-gray-800 shadow-sm hover:border-gray-300 dark:hover:border-gray-700'
+                ? 'bg-gradient-to-b from-indigo-950/40 via-[#080d1a] to-[#080d1a] border-2 border-indigo-500 shadow-2xl shadow-indigo-500/15'
+                : 'bg-white dark:bg-[#080d1a] border border-gray-200 dark:border-white/[0.08] shadow-sm hover:border-slate-300 dark:hover:border-white/[0.18]'
             }`}
           >
             {plan.popular && (
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold bg-brand-600 text-white tracking-wide shadow-md">
+              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white tracking-wide shadow-md font-mono">
                 MOST POPULAR
               </div>
             )}
@@ -114,15 +120,15 @@ export default function PricingPage() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">{plan.name}</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 min-h-[36px]">{plan.description}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 min-h-[36px] leading-relaxed">{plan.description}</p>
               </div>
 
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl sm:text-5xl font-extrabold text-gray-900 dark:text-white">{plan.price}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{plan.period}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium font-mono">{plan.period}</span>
               </div>
 
-              <div className="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+              <div className="pt-4 border-t border-gray-100 dark:border-white/[0.08] space-y-3">
                 <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 uppercase tracking-wider">
                   Included benefits:
                 </p>
@@ -144,19 +150,17 @@ export default function PricingPage() {
                   <span>Current Active Plan</span>
                 </div>
               ) : (
-                <button
+                <Button
                   onClick={() => handlePlanClick(plan)}
-                  className={`w-full py-3 px-6 rounded-xl text-center font-bold text-sm transition-all block cursor-pointer transform hover:-translate-y-0.5 ${
-                    plan.popular
-                      ? 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                      : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
-                  }`}
+                  variant={plan.popular ? 'primary' : 'secondary'}
+                  size="lg"
+                  className="w-full text-center font-bold text-sm shadow-md"
                 >
                   {plan.cta}
-                </button>
+                </Button>
               )}
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 
